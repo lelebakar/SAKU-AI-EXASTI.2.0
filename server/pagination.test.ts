@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { sakuCrmContacts, sakuMessages } from "../drizzle/schema";
-import { getDb, listSakuCrmContacts, listSakuMessages } from "./db";
+import { getDb, insertSakuMessage, listSakuCrmContacts, listSakuMessages } from "./db";
 
 const ownerOpenId = `pagination-test-${Date.now()}`;
 const channelId = "pagination-channel";
@@ -27,6 +27,17 @@ describe("bounded list pagination", () => {
     const older = await listSakuMessages(ownerOpenId, channelId, { limit: 2, cursor: first.nextCursor! });
     expect(older.items.map((item) => item.content)).toEqual(["Message 1"]);
     expect(older.nextCursor).toBeNull();
+  });
+
+  it("makes duplicate message inserts idempotent by messageKey", async () => {
+    const message = { messageKey: `${ownerOpenId}-idempotent`, ownerOpenId, channelId, sender: "assistant" as const, senderName: "Saku", senderRole: null, content: "Satu pesan", attachmentJson: null };
+    const first = await insertSakuMessage(message);
+    const second = await insertSakuMessage({ ...message, content: "Pesan yang sama" });
+    const rows = await listSakuMessages(ownerOpenId, channelId, { limit: 10 });
+
+    expect(second?.id).toBe(first?.id);
+    expect(rows.items.filter((row) => row.messageKey === message.messageKey)).toHaveLength(1);
+    expect(rows.items.find((row) => row.messageKey === message.messageKey)?.content).toBe("Satu pesan");
   });
 
   it("pages CRM contacts instead of returning every active contact", async () => {

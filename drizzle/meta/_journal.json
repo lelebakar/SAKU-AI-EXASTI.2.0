@@ -169,6 +169,13 @@
       "when": 1789456223808,
       "tag": "0023_illegal_selene",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1789459993922,
+      "tag": "0024_large_skin",
+      "breakpoints": true
     }
   ]
 }

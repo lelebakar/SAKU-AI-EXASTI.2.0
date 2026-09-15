@@ -308,7 +308,7 @@ export const sakuWorkspaceMembers = mysqlTable("saku_workspace_members", {
   status: mysqlEnum("status", ["pending", "active", "removed"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ({ ownerStatusIndex: index("saku_workspace_members_owner_status_idx").on(table.ownerOpenId, table.status), emailStatusIndex: index("saku_workspace_members_email_status_idx").on(table.email, table.status) }));
 
 export const sakuSupportRequests = mysqlTable("saku_support_requests", {
   id: int("id").autoincrement().primaryKey(),
@@ -318,7 +318,7 @@ export const sakuSupportRequests = mysqlTable("saku_support_requests", {
   message: text("message").notNull(),
   status: mysqlEnum("status", ["open", "in_progress", "resolved"]).default("open").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => ({ ownerCreatedIndex: index("saku_support_requests_owner_created_idx").on(table.ownerOpenId, table.createdAt) }));
 
 export const sakuIntegrationCredentials = mysqlTable("saku_integration_credentials", {
   id: int("id").autoincrement().primaryKey(),
@@ -354,7 +354,7 @@ export const sakuJournalEntries = mysqlTable("saku_journal_entries", {
   sourceUrl: text("sourceUrl"),
   sourceType: varchar("sourceType", { length: 40 }).default("receipt").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => ({ workspaceTransactionDateIndex: index("saku_journal_entries_workspace_date_idx").on(table.workspaceId, table.transactionDate) }));
 
 export const sakuFinanceReceivables = mysqlTable("saku_finance_receivables", {
   id: int("id").autoincrement().primaryKey(),
@@ -366,7 +366,7 @@ export const sakuFinanceReceivables = mysqlTable("saku_finance_receivables", {
   paidMutationId: varchar("paidMutationId", { length: 160 }),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => ({ workspaceStatusIndex: index("saku_finance_receivables_workspace_status_idx").on(table.workspaceId, table.status), workspaceCreatedIndex: index("saku_finance_receivables_workspace_created_idx").on(table.workspaceId, table.createdAt) }));
 
 export const sakuBankMutations = mysqlTable("saku_bank_mutations", {
   id: int("id").autoincrement().primaryKey(),
