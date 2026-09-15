@@ -19,67 +19,32 @@ describe("Manus-only embedding provider", () => {
     }
   });
 
-  it("falls back to the projection when the optional provider fails", async () => {
+  it("does not call an LLM when the optional provider fails", async () => {
     const originalKey = process.env.OPENAI_API_KEY;
     const originalFetch = globalThis.fetch;
-    const originalForgeApiUrl = ENV.forgeApiUrl;
-    const originalForgeApiKey = ENV.forgeApiKey;
     process.env.OPENAI_API_KEY = "test-openai-key";
-    ENV.forgeApiUrl = "https://forge.test";
-    ENV.forgeApiKey = "test-forge-key";
-    globalThis.fetch = vi.fn(async () => {
-      if (vi.mocked(globalThis.fetch).mock.calls.length === 1) throw new Error("external unavailable");
-      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ values: Array.from({ length: 16 }, () => 0.25) }) } }] }), { status: 200 });
-    }) as typeof fetch;
+    globalThis.fetch = vi.fn(async () => { throw new Error("external unavailable"); }) as typeof fetch;
     try {
-      await expect(createTextEmbeddingWithProvider("memory")).resolves.toMatchObject({ provider: "manus-projection", embedding: expect.any(Array) });
-      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+      await expect(createTextEmbeddingWithProvider("memory")).resolves.toBeUndefined();
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     } finally {
       if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
       else process.env.OPENAI_API_KEY = originalKey;
-      ENV.forgeApiUrl = originalForgeApiUrl;
-      ENV.forgeApiKey = originalForgeApiKey;
       globalThis.fetch = originalFetch;
     }
   });
 
-  it("uses the supported Forge chat endpoint for semantic projection", async () => {
+  it("uses keyword fallback without making an LLM request when no provider is configured", async () => {
     const originalFetch = globalThis.fetch;
     const originalKey = ENV.openaiApiKey;
     const originalProcessKey = process.env.OPENAI_API_KEY;
-    const originalForgeApiUrl = ENV.forgeApiUrl;
-    const originalForgeApiKey = ENV.forgeApiKey;
     ENV.openaiApiKey = "";
-    ENV.forgeApiUrl = "https://forge.test";
-    ENV.forgeApiKey = "test-forge-key";
     delete process.env.OPENAI_API_KEY;
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ values: Array.from({ length: 16 }, () => 0.5) }) } }] }), { status: 200 })) as typeof fetch;
+    globalThis.fetch = vi.fn() as typeof fetch;
     const vector = await createTextEmbedding("memory");
-    expect(vector).toHaveLength(16);
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(vector).toBeUndefined();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
     ENV.openaiApiKey = originalKey;
-    ENV.forgeApiUrl = originalForgeApiUrl;
-    ENV.forgeApiKey = originalForgeApiKey;
-    if (originalProcessKey === undefined) delete process.env.OPENAI_API_KEY;
-    else process.env.OPENAI_API_KEY = originalProcessKey;
-    globalThis.fetch = originalFetch;
-  });
-
-  it("returns undefined for keyword fallback when Manus projection fails", async () => {
-    const originalFetch = globalThis.fetch;
-    const originalKey = ENV.openaiApiKey;
-    const originalProcessKey = process.env.OPENAI_API_KEY;
-    const originalForgeApiUrl = ENV.forgeApiUrl;
-    const originalForgeApiKey = ENV.forgeApiKey;
-    ENV.openaiApiKey = "";
-    ENV.forgeApiUrl = "https://forge.test";
-    ENV.forgeApiKey = "test-forge-key";
-    delete process.env.OPENAI_API_KEY;
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: "not-json" } }] }), { status: 200 })) as typeof fetch;
-    await expect(createTextEmbedding("memory")).resolves.toBeUndefined();
-    ENV.openaiApiKey = originalKey;
-    ENV.forgeApiUrl = originalForgeApiUrl;
-    ENV.forgeApiKey = originalForgeApiKey;
     if (originalProcessKey === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = originalProcessKey;
     globalThis.fetch = originalFetch;

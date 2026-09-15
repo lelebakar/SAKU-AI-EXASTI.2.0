@@ -3,32 +3,32 @@ import { createTextEmbedding } from "./embeddings";
 import { selectRelevantMemories } from "./db";
 import { ENV } from "./_core/env";
 
-describe("semantic memory embedding contract", () => {
-  it("creates a vector and finds a saved memory with different wording", async () => {
-    const originalForgeApiUrl = ENV.forgeApiUrl;
-    const originalForgeApiKey = ENV.forgeApiKey;
+describe("memory retrieval without a real embedding provider", () => {
+  it("uses keyword retrieval without calling the LLM", async () => {
     const originalFetch = globalThis.fetch;
-    ENV.forgeApiUrl = "https://forge.test";
-    ENV.forgeApiKey = "test-forge-key";
-    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ values: Array.from({ length: 16 }, () => 0.5) }) } }] }), { status: 200 })) as typeof fetch;
+    const originalKey = ENV.openaiApiKey;
+    const originalProcessKey = process.env.OPENAI_API_KEY;
+    ENV.openaiApiKey = "";
+    delete process.env.OPENAI_API_KEY;
+    globalThis.fetch = vi.fn() as typeof fetch;
 
     try {
-    const savedMemory = "Pelanggan utama menunggu jawaban penawaran sebelum Jumat.";
-    const query = "Siapa calon pembeli yang masih perlu di-follow up?";
-    const savedVector = await createTextEmbedding(savedMemory);
-    const queryVector = await createTextEmbedding(query);
+      const savedMemory = "Pelanggan utama menunggu jawaban penawaran sebelum Jumat.";
+      const query = "Pelanggan penawaran";
+      const queryVector = await createTextEmbedding(query);
 
-    expect(savedVector, "embedding provider must return a vector").toBeDefined();
-    expect(queryVector, "embedding provider must return a query vector").toBeDefined();
-    const results = selectRelevantMemories([
-      { memory: savedMemory, importance: "high", embeddingJson: JSON.stringify(savedVector) },
-    ], query, queryVector);
+      expect(queryVector).toBeUndefined();
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      const results = selectRelevantMemories([
+        { memory: savedMemory, importance: "medium", embeddingJson: null },
+      ], query, queryVector);
 
-    expect(results).toHaveLength(1);
-    expect(results[0]?.memory).toBe(savedMemory);
+      expect(results).toHaveLength(1);
+      expect(results[0]?.memory).toBe(savedMemory);
     } finally {
-      ENV.forgeApiUrl = originalForgeApiUrl;
-      ENV.forgeApiKey = originalForgeApiKey;
+      ENV.openaiApiKey = originalKey;
+      if (originalProcessKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = originalProcessKey;
       globalThis.fetch = originalFetch;
     }
   }, 30_000);

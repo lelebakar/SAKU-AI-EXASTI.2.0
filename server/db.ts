@@ -653,7 +653,7 @@ export async function createSakuMemory(memory: InsertSakuMemory) {
   await db.insert(sakuMemories).values({
     ...memory,
     embeddingJson: embeddingResult ? JSON.stringify(embeddingResult.embedding) : null,
-    embeddingProvider: embeddingResult?.provider ?? null,
+    embeddingProvider: embeddingResult?.provider ?? "keyword",
   });
   const rows = await db.select().from(sakuMemories).where(eq(sakuMemories.ownerOpenId, memory.ownerOpenId)).orderBy(desc(sakuMemories.id)).limit(1);
   return rows[0];
@@ -662,11 +662,16 @@ export async function createSakuMemory(memory: InsertSakuMemory) {
 export async function backfillSakuMemoryEmbeddings() {
   const db = await getDb();
   if (!db) return { scanned: 0, updated: 0, failed: 0 };
-  const rows = await db.select().from(sakuMemories).where(or(isNull(sakuMemories.embeddingJson), isNull(sakuMemories.embeddingProvider), eq(sakuMemories.embeddingProvider, "manus-projection")));
+  const rows = await db.select().from(sakuMemories).where(or(isNull(sakuMemories.embeddingJson), isNull(sakuMemories.embeddingProvider), eq(sakuMemories.embeddingProvider, "manus-projection"), eq(sakuMemories.embeddingProvider, "keyword")));
   let updated = 0;
   let failed = 0;
   for (const row of rows) {
     try {
+      if (row.embeddingProvider === "manus-projection") {
+        await db.update(sakuMemories).set({ embeddingJson: null, embeddingProvider: "keyword" }).where(eq(sakuMemories.id, row.id));
+        updated += 1;
+        continue;
+      }
       const embeddingResult = await createTextEmbeddingWithProvider(row.memory);
       if (!embeddingResult) {
         failed += 1;

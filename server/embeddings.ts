@@ -1,14 +1,7 @@
 import { ENV } from "./_core/env";
-import { invokeLLM } from "./_core/llm";
-
-const DEFAULT_SEMANTIC_MODEL = "gpt-5-mini";
-const SEMANTIC_AXES = [
-  "sales", "marketing", "finance", "operations", "customer", "inventory", "people", "planning",
-  "urgency", "risk", "follow_up", "content", "analytics", "process", "relationship", "personal_preference",
-] as const;
 
 export type Embedding = number[];
-export type EmbeddingProvider = "openai" | "manus-projection";
+export type EmbeddingProvider = "openai" | "keyword";
 export type EmbeddingResult = { embedding: Embedding; provider: EmbeddingProvider };
 
 function externalEmbeddingConfig() {
@@ -35,7 +28,7 @@ async function createExternalEmbedding(text: string): Promise<Embedding | undefi
   return Array.isArray(vector) && vector.length > 0 && vector.every((item) => typeof item === "number") ? vector as number[] : undefined;
 }
 
-/** External provider when configured; Manus projection remains the portable fallback. */
+/** Use a real embedding provider when configured; callers use keyword search otherwise. */
 export async function createTextEmbeddingWithProvider(text: string): Promise<EmbeddingResult | undefined> {
   const value = text.trim();
   if (!value) {
@@ -54,46 +47,12 @@ export async function createTextEmbeddingWithProvider(text: string): Promise<Emb
       }
       throw new Error("external embedding response did not contain a numeric vector");
     } catch (error) {
-      console.warn(`[Embeddings] provider=openai latencyMs=${Date.now() - startedAt} error=${error instanceof Error ? error.message : String(error)}; falling back to projection`);
+      console.warn(`[Embeddings] provider=openai latencyMs=${Date.now() - startedAt} error=${error instanceof Error ? error.message : String(error)}; keyword fallback will be used`);
     }
   }
 
-  if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-    console.warn("[Embeddings] provider=manus-projection error=no Forge configuration");
-    return undefined;
-  }
-  const startedAt = Date.now();
-  try {
-    const response = await invokeLLM({
-      model: DEFAULT_SEMANTIC_MODEL,
-      messages: [
-        { role: "system", content: `Map text to a semantic vector. Return JSON only. Score each axis from -1 to 1; related meanings must receive similar scores even when wording differs. Axes: ${SEMANTIC_AXES.join(", ")}.` },
-        { role: "user", content: value },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "semantic_vector",
-          strict: true,
-          schema: {
-            type: "object",
-            properties: { values: { type: "array", minItems: SEMANTIC_AXES.length, maxItems: SEMANTIC_AXES.length, items: { type: "number" } } },
-            required: ["values"],
-            additionalProperties: false,
-          },
-        },
-      },
-    });
-    const content = response.choices?.[0]?.message?.content;
-    const parsed = typeof content === "string" ? JSON.parse(content) as { values?: unknown } : undefined;
-    const vector = parsed?.values;
-    const result = Array.isArray(vector) && vector.length === SEMANTIC_AXES.length && vector.every((item) => typeof item === "number") ? vector as number[] : undefined;
-    console.info(`[Embeddings] provider=manus-projection model=${DEFAULT_SEMANTIC_MODEL} latencyMs=${Date.now() - startedAt}`);
-    return result ? { embedding: result, provider: "manus-projection" } : undefined;
-  } catch (error) {
-    console.warn(`[Embeddings] provider=manus-projection latencyMs=${Date.now() - startedAt} error=${error instanceof Error ? error.message : String(error)}; keyword fallback will be used`);
-    return undefined;
-  }
+  console.info("[Embeddings] provider=keyword reason=no external embedding provider configured");
+  return undefined;
 }
 
 export async function createTextEmbedding(text: string): Promise<Embedding | undefined> {
