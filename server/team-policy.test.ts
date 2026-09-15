@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import { assertToolAllowed, isToolAllowed, resolveTeamPolicy } from "./team-policy";
 
 describe("Saku AI segregation of duties", () => {
-  it("keeps the main assistant read-only and unable to create teams", () => {
+  it("allows Dita to manage teams while keeping finance and media tools restricted", () => {
     const policy = resolveTeamPolicy("assistant");
     expect(isToolAllowed(policy, "list_divisions")).toBe(true);
-    expect(isToolAllowed(policy, "create_division")).toBe(false);
+    expect(isToolAllowed(policy, "create_division")).toBe(true);
+    expect(isToolAllowed(policy, "update_division")).toBe(true);
+    expect(isToolAllowed(policy, "delete_division")).toBe(true);
+    expect(isToolAllowed(policy, "recommend_team_structure")).toBe(true);
     expect(isToolAllowed(policy, "record_finance_transaction")).toBe(false);
     expect(isToolAllowed(policy, "generate_image")).toBe(false);
   });

@@ -23,7 +23,7 @@ const POLICY_BY_TEAM: Record<string, Omit<TeamPolicy, "channelId">> = {
     teamKey: "assistant",
     label: "Tim Utama",
     capabilities: ["workspace_read"],
-    allowedToolNames: READ_ONLY_TOOLS,
+    allowedToolNames: [...READ_ONLY_TOOLS, "create_division", "update_division", "delete_division", "recommend_team_structure"],
   },
   sales: {
     teamKey: "sales",

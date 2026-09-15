@@ -5,7 +5,7 @@ import { invokeLLM, type Message, type Tool, type ToolCall } from "./_core/llm";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router, workspaceAdminProcedure, workspaceProcedure } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { acceptSakuWorkspaceInvitation, consumePasswordResetToken, createPasswordResetTokenValue, getPasswordResetToken, hashPasswordResetToken, listSakuPendingWorkspaceInvitations, savePasswordResetToken, advanceSakuPipeline, completeSakuProductionOrder, confirmSakuSalesOrder, createEmailUser, createSakuAutomation, createSakuAutomationRun, createSakuBom, createSakuCrmActivity, createSakuCrmContact, createSakuDivision, createSakuFinanceReceivable, createSakuInventoryItem, createSakuJournalEntry, createSakuMemory, createSakuPipeline, createSakuProductionOrder, createSakuReconciliationRule, createSakuSalesOrder, createSakuSupportRequest, deleteSakuReconciliationRule, ensureSakuEmployeeBundle, ensureSakuTeamStandards, findSakuJournalDuplicates, getSakuAgentByChannel, getSakuFiles, getSakuFinanceReview, getSakuFinanceStatements, getSakuTeamConfiguration, getSakuTeamStandards, getSakuWorkspace, getSakuWorkspaceSnapshot, getUserByEmail, insertSakuFile, insertSakuMessage, inviteSakuWorkspaceMember, listSakuAgents, listSakuAutomations, listSakuBoms, listSakuCrmActivities, listSakuCrmContacts, listSakuDivisions, getSakuPipelineTemplate, listSakuInventoryItems, listSakuInventoryMovements, listSakuJournalEntries, listSakuMemories, listSakuMessages, listSakuPipelineTemplates, listSakuPipelines, listSakuProductionOrders, listSakuAutomationRuns, listSakuReconciliationRules, listSakuSalesOrders, listSakuSupportRequests, listSakuWorkspaceBusinessTypes, listSakuWorkspaceMembers, recordSakuInventoryMovement, replaceSakuWorkspaceBusinessTypes, seedSakuOnboarding, updateSakuCrmContact, updateSakuWorkspaceMember, updateUserPassword, upsertMootaIntegration, upsertSakuAgent, upsertSakuTeamStandards, upsertSakuWorkspace } from "./db";
+import { acceptSakuWorkspaceInvitation, consumePasswordResetToken, createPasswordResetTokenValue, getPasswordResetToken, hashPasswordResetToken, listSakuPendingWorkspaceInvitations, savePasswordResetToken, advanceSakuPipeline, completeSakuProductionOrder, confirmSakuSalesOrder, createEmailUser, createSakuAutomation, createSakuAutomationRun, createSakuBom, createSakuCrmActivity, createSakuCrmContact, createSakuDivision, createSakuFinanceReceivable, createSakuInventoryItem, createSakuJournalEntry, createSakuMemory, createSakuPipeline, createSakuProductionOrder, createSakuReconciliationRule, createSakuSalesOrder, createSakuSupportRequest, deleteSakuDivision, deleteSakuReconciliationRule, ensureSakuEmployeeBundle, ensureSakuTeamStandards, findSakuJournalDuplicates, getSakuAgentByChannel, getSakuFiles, getSakuFinanceReview, getSakuFinanceStatements, getSakuTeamConfiguration, getSakuTeamStandards, getSakuWorkspace, getSakuWorkspaceSnapshot, getUserByEmail, insertSakuFile, insertSakuMessage, inviteSakuWorkspaceMember, listSakuAgents, listSakuAutomations, listSakuBoms, listSakuCrmActivities, listSakuCrmContacts, listSakuDivisions, getSakuPipelineTemplate, listSakuInventoryItems, listSakuInventoryMovements, listSakuJournalEntries, listSakuMemories, listSakuMessages, listSakuPipelineTemplates, listSakuPipelines, listSakuProductionOrders, listSakuAutomationRuns, listSakuReconciliationRules, listSakuSalesOrders, listSakuSupportRequests, listSakuWorkspaceBusinessTypes, listSakuWorkspaceMembers, recordSakuInventoryMovement, replaceSakuWorkspaceBusinessTypes, seedSakuOnboarding, updateSakuCrmContact, updateSakuWorkspaceMember, updateSakuDivision, updateUserPassword, upsertMootaIntegration, upsertSakuAgent, upsertSakuTeamStandards, upsertSakuWorkspace } from "./db";
 import { storagePut } from "./storage";
 import { generateImage } from "./_core/imageGeneration";
 import { generateSpeech, generateVideo } from "./_core/mediaGeneration";
@@ -98,6 +98,8 @@ const createDivisionArgs = z.object({
   businessArea: z.string().min(2).max(80),
   description: z.string().min(8).max(500),
 });
+const updateDivisionArgs = z.object({ id: z.number().int().positive(), name: z.string().min(2).max(120).optional(), businessArea: z.string().min(2).max(80).optional(), description: z.string().min(8).max(500).optional() });
+const deleteDivisionArgs = z.object({ id: z.number().int().positive() });
 
 const createAutomationArgs = z.object({
   name: z.string().min(2).max(160),
@@ -216,6 +218,30 @@ const workspaceTools: Tool[] = [
         required: ["name", "businessArea", "description"],
         additionalProperties: false,
       },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_division",
+      description: "Mengubah nama, area bisnis, atau tanggung jawab tim yang sudah ada ketika pemilik meminta revisi.",
+      parameters: { type: "object", properties: { id: { type: "number", description: "ID divisi dari daftar tim" }, name: { type: "string" }, businessArea: { type: "string" }, description: { type: "string" } }, required: ["id"], additionalProperties: false },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_division",
+      description: "Menghapus tim hanya jika pemilik secara eksplisit meminta tim tertentu dihapus. Sebelum menjalankan, sebutkan nama tim dan minta konfirmasi bila permintaan masih ambigu.",
+      parameters: { type: "object", properties: { id: { type: "number", description: "ID divisi dari daftar tim" } }, required: ["id"], additionalProperties: false },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "recommend_team_structure",
+      description: "Membaca tim yang ada dan menyiapkan data agar Dita dapat menyarankan tim yang perlu ditambah, digabung, diubah, atau dihentikan.",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
     },
   },
   {
@@ -593,6 +619,20 @@ export const appRouter = router({
                   }
                   return { toolName: "create_division", success: true, division };
                 }
+                if (toolCall.function.name === "update_division") {
+                  const args = updateDivisionArgs.parse(parseToolArguments(toolCall.function.arguments));
+                  const division = await updateSakuDivision(ctx.workspaceOwnerOpenId!, args.id, { name: args.name, businessArea: args.businessArea, description: args.description });
+                  return { toolName: "update_division", success: Boolean(division), division };
+                }
+                if (toolCall.function.name === "delete_division") {
+                  const args = deleteDivisionArgs.parse(parseToolArguments(toolCall.function.arguments));
+                  await deleteSakuDivision(ctx.workspaceOwnerOpenId!, args.id);
+                  return { toolName: "delete_division", success: true, id: args.id };
+                }
+                if (toolCall.function.name === "recommend_team_structure") {
+                  const divisions = await listSakuDivisions(ctx.workspaceOwnerOpenId!);
+                  return { toolName: "recommend_team_structure", success: true, divisions };
+                }
                 if (toolCall.function.name === "record_finance_transaction") {
                   const args = recordFinanceTransactionArgs.parse(parseToolArguments(toolCall.function.arguments));
                   const transactionDate = new Date(`${args.date}T12:00:00`);
@@ -805,6 +845,15 @@ export const appRouter = router({
     }),
     divisions: router({
       list: workspaceProcedure.query(({ ctx }) => listSakuDivisions(ctx.workspaceOwnerOpenId!)),
+      create: workspaceProcedure.input(z.object({ name: z.string().trim().min(2).max(120), businessArea: z.string().trim().min(2).max(80), description: z.string().trim().min(8).max(500) })).mutation(async ({ ctx, input }) => {
+        const slug = input.businessArea.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "division";
+        const channelId = `custom-${Date.now()}-${slug}`;
+        const division = await createSakuDivision({ ownerOpenId: ctx.workspaceOwnerOpenId!, channelId, name: input.name, businessArea: input.businessArea, description: input.description, avatarClass: "bg-[#e5e9f6] text-[#5e6a9e]" });
+        await ensureSakuEmployeeBundle(ctx.workspaceOwnerOpenId!, channelId);
+        return division;
+      }),
+      update: workspaceAdminProcedure.input(z.object({ id: z.number().int().positive(), name: z.string().trim().min(2).max(120).optional(), businessArea: z.string().trim().min(2).max(80).optional(), description: z.string().trim().min(8).max(500).optional() })).mutation(({ ctx, input }) => updateSakuDivision(ctx.workspaceOwnerOpenId!, input.id, { name: input.name, businessArea: input.businessArea, description: input.description })),
+      remove: workspaceAdminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteSakuDivision(ctx.workspaceOwnerOpenId!, input.id)),
     }),
     snapshot: workspaceProcedure.query(({ ctx }) => getSakuWorkspaceSnapshot(ctx.workspaceOwnerOpenId!)),
     pipelineTemplates: router({

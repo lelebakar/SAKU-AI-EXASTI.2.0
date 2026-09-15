@@ -422,6 +422,21 @@ export async function createSakuDivision(division: InsertSakuDivision) {
   return rows[0];
 }
 
+export async function updateSakuDivision(ownerOpenId: string, id: number, update: { name?: string; businessArea?: string; description?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.update(sakuDivisions).set(update).where(and(eq(sakuDivisions.ownerOpenId, ownerOpenId), eq(sakuDivisions.id, id)));
+  const rows = await db.select().from(sakuDivisions).where(and(eq(sakuDivisions.ownerOpenId, ownerOpenId), eq(sakuDivisions.id, id))).limit(1);
+  return rows[0];
+}
+
+export async function deleteSakuDivision(ownerOpenId: string, id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.delete(sakuDivisions).where(and(eq(sakuDivisions.ownerOpenId, ownerOpenId), eq(sakuDivisions.id, id)));
+  return { deleted: true } as const;
+}
+
 export async function listSakuAutomations(ownerOpenId: string) {
   const db = await getDb();
   if (!db) return [];
