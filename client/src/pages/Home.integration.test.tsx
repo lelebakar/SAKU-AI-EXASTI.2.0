@@ -359,4 +359,22 @@ describe("SAKU AI rendered create-division flow", () => {
     await waitFor(() => expect(mocks.onboardingPrepareMutate).toHaveBeenCalledWith({ businessName: "Toko Rona", businessDescription: "Kami menjual skincare lokal lewat Instagram dan marketplace.", customer: "Perempuan usia 25 sampai 40 tahun.", biggestChallenge: "Saya sering lupa follow-up calon pelanggan.", priorities: ["Penjualan", "Marketing"] }));
     expect(screen.queryByText("Wawancara ringan bersama Dita")).toBeNull();
   });
+
+  it("can go back and edit an earlier onboarding answer without losing later answers", async () => {
+    mocks.workspaceProfile = undefined;
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Wawancara ringan bersama Dita")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Mulai wawancara" }));
+    fireEvent.change(screen.getByPlaceholderText("Contoh: Toko Rona"), { target: { value: "Nama Lama" } });
+    fireEvent.click(screen.getByRole("button", { name: "Lanjut" }));
+    fireEvent.change(screen.getByPlaceholderText(/Kami menjual skincare/), { target: { value: "Deskripsi bisnis yang cukup panjang." } });
+    fireEvent.click(screen.getByRole("button", { name: "Lanjut" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Kembali ke pertanyaan sebelumnya" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Kembali ke pertanyaan sebelumnya" })[0]);
+
+    expect((screen.getByPlaceholderText("Contoh: Toko Rona") as HTMLInputElement).value).toBe("Nama Lama");
+    fireEvent.change(screen.getByPlaceholderText("Contoh: Toko Rona"), { target: { value: "Nama Baru" } });
+    fireEvent.click(screen.getByRole("button", { name: "Lanjut" }));
+    expect((screen.getByPlaceholderText(/Kami menjual skincare/) as HTMLTextAreaElement).value).toBe("Deskripsi bisnis yang cukup panjang.");
+  });
 });
