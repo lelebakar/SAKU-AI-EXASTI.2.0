@@ -55,6 +55,8 @@ describe("Saku AI helpers", () => {
     const assistantPrompt = buildWorkspaceSystemPrompt({ channel: "assistant", teamName: "Dita", businessName: "Toko Rona", agentName: "Dita", agentRole: "Asisten Pribadi" });
     expect(assistantPrompt).toContain("memiliki kewenangan workspace untuk mengelola seluruh tim");
     expect(assistantPrompt).toContain("jangan menolak");
+    expect(assistantPrompt).toContain("all=true");
+    expect(assistantPrompt).toContain("Jangan mengganti permintaan hapus menjadi list_divisions saja");
     const teamPrompt = buildWorkspaceSystemPrompt({ channel: "sales", teamName: "Tim Sales", businessName: "Toko Rona", agentName: "Raka", agentRole: "Sales Lead" });
     expect(teamPrompt).toContain("Dita di Ruang Utama");
   });

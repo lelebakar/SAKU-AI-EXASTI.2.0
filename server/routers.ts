@@ -102,7 +102,7 @@ const createDivisionArgs = z.object({
   description: z.string().min(8).max(500),
 });
 const updateDivisionArgs = z.object({ id: z.number().int().positive(), name: z.string().min(2).max(120).optional(), businessArea: z.string().min(2).max(80).optional(), description: z.string().min(8).max(500).optional() });
-const deleteDivisionArgs = z.object({ id: z.number().int().positive() });
+const deleteDivisionArgs = z.object({ id: z.number().int().positive().optional(), name: z.string().min(2).max(120).optional(), all: z.boolean().default(false) });
 
 const createAutomationArgs = z.object({
   name: z.string().min(2).max(160),
@@ -235,8 +235,8 @@ const workspaceTools: Tool[] = [
     type: "function",
     function: {
       name: "delete_division",
-      description: "Menghapus tim hanya jika pemilik secara eksplisit meminta tim tertentu dihapus. Sebelum menjalankan, sebutkan nama tim dan minta konfirmasi bila permintaan masih ambigu.",
-      parameters: { type: "object", properties: { id: { type: "number", description: "ID divisi dari daftar tim" } }, required: ["id"], additionalProperties: false },
+      description: "Menghapus satu tim berdasarkan id atau semua tim jika pemilik secara eksplisit mengatakan semua tim. Sistem selalu meminta konfirmasi kedua sebelum benar-benar menghapus.",
+      parameters: { type: "object", properties: { id: { type: "number", description: "ID divisi dari daftar tim jika tersedia" }, name: { type: "string", description: "Nama tim yang diminta pemilik untuk dihapus" }, all: { type: "boolean", description: "true hanya jika pemilik meminta semua tim dihapus" } }, required: [], additionalProperties: false },
     },
   },
   {
@@ -632,11 +632,14 @@ export const appRouter = router({
                   const latestUserMessage = [...input.history].reverse().find((message) => message.role === "user")?.content || "";
                   const confirmed = hasExplicitTeamDeletionConfirmation(latestUserMessage);
                   const divisions = await listSakuDivisions(ctx.workspaceOwnerOpenId!);
-                  const division = divisions.find((item) => item.id === args.id);
-                  if (!division) throw new Error("Tim yang akan dihapus tidak ditemukan.");
-                  if (!confirmed) return { toolName: "delete_division", success: false, confirmationRequired: true, divisionId: division.id, divisionName: division.name, message: `Konfirmasi diperlukan sebelum menghapus ${division.name}.` };
-                  await deleteSakuDivision(ctx.workspaceOwnerOpenId!, args.id);
-                  return { toolName: "delete_division", success: true, id: args.id, divisionName: division.name };
+                  if (!args.all && !args.id && !args.name) return { toolName: "delete_division", success: false, clarificationRequired: true, message: `Tim mana yang ingin dihapus? Tim yang tersedia: ${divisions.map((item) => item.name).join(", ") || "belum ada"}.` };
+                  const normalizedName = args.name?.trim().toLowerCase();
+                  const targets = args.all ? divisions : divisions.filter((item) => (args.id ? item.id === args.id : item.name.toLowerCase() === normalizedName || item.name.toLowerCase().includes(normalizedName || "__no_match__")));
+                  if (!targets.length) throw new Error(args.all ? "Belum ada tim divisi yang bisa dihapus." : "Tim yang akan dihapus tidak ditemukan.");
+                  const divisionName = args.all ? `semua tim (${targets.map((item) => item.name).join(", ")})` : targets[0]!.name;
+                  if (!confirmed) return { toolName: "delete_division", success: false, confirmationRequired: true, all: args.all, divisionId: targets[0]!.id, divisionIds: targets.map((item) => item.id), divisionName, message: `Konfirmasi diperlukan sebelum menghapus ${divisionName}.` };
+                  await Promise.all(targets.map((item) => deleteSakuDivision(ctx.workspaceOwnerOpenId!, item.id)));
+                  return { toolName: "delete_division", success: true, all: args.all, divisionIds: targets.map((item) => item.id), divisionName };
                 }
                 if (toolCall.function.name === "recommend_team_structure") {
                   const divisions = await listSakuDivisions(ctx.workspaceOwnerOpenId!);
