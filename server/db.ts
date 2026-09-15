@@ -15,6 +15,25 @@ export function isReceiptDuplicate(candidate: { vendor: string; total: number; i
   return candidate.vendor.trim().toLowerCase() === input.vendor.trim().toLowerCase() && candidate.total === input.total && canonicalizeReceiptItems(candidate.itemsText) === canonicalizeReceiptItems(input.itemsText);
 }
 
+const SAKU_BUSINESS_TIME_ZONE = "Asia/Jakarta";
+const sakuBusinessDateFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: SAKU_BUSINESS_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+export function getSakuWibDayBounds(transactionDate: Date) {
+  if (Number.isNaN(transactionDate.getTime())) throw new Error("Invalid transaction date");
+  const parts = Object.fromEntries(sakuBusinessDateFormatter.formatToParts(transactionDate).map(({ type, value }) => [type, value]));
+  const year = Number(parts.year);
+  const month = Number(parts.month);
+  const day = Number(parts.day);
+  const start = new Date(Date.UTC(year, month - 1, day) - 7 * 60 * 60 * 1000);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+  return { start, end };
+}
+
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -271,8 +290,7 @@ export async function findSakuJournalDuplicates(ownerOpenId: string, input: { ve
   if (!db) throw new Error("Database is not available");
   const workspace = await getSakuWorkspace(ownerOpenId);
   if (!workspace) throw new Error("Workspace is not available");
-  const start = new Date(input.transactionDate); start.setHours(0, 0, 0, 0);
-  const end = new Date(input.transactionDate); end.setHours(23, 59, 59, 999);
+  const { start, end } = getSakuWibDayBounds(input.transactionDate);
   const rows = await db.select().from(sakuJournalEntries).where(and(eq(sakuJournalEntries.workspaceId, workspace.id), eq(sakuJournalEntries.total, input.total), gte(sakuJournalEntries.transactionDate, start), lte(sakuJournalEntries.transactionDate, end))).orderBy(desc(sakuJournalEntries.id));
   return rows.filter((row) => isReceiptDuplicate(row, input));
 }
