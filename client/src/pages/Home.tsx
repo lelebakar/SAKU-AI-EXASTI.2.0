@@ -767,8 +767,8 @@ function WorkspaceApp() {
     appendMessage(selectedId, ownerMessage);
     saveMessage(selectedId, ownerMessage);
     setInput("");
-    const currentMessages = [...selectedChat.messages, ownerMessage].slice(-10).map((message) => ({ role: message.sender === "owner" ? "user" as const : "assistant" as const, content: message.text || (message.attachment ? `File terlampir: ${message.attachment.name}\n${message.attachment.extractedText || message.attachment.extractionPreview || "Tidak ada teks yang terbaca."}` : "Dokumen terlampir") }));
-    if (attachmentContext) currentMessages.push({ role: "user", content: `File yang baru dikirim: ${attachmentContext.name}\nJenis: ${attachmentContext.detectedKind || attachmentContext.type}\n${attachmentContext.extractedText || attachmentContext.extractionPreview || "Tidak ada teks yang terbaca; gunakan nama file dan metadata untuk menjelaskan kemungkinan kegunaannya."}`.slice(0, 4000) });
+    const currentMessages = [...selectedChat.messages, ownerMessage].slice(-10).map((message) => ({ role: message.sender === "owner" ? "user" as const : "assistant" as const, content: message.text || (message.attachment ? `File terlampir: ${message.attachment.name}\n${(message.attachment.extractedText || message.attachment.extractionPreview || "Tidak ada teks yang terbaca.").slice(0, 3000)}` : "Dokumen terlampir") }));
+    if (attachmentContext) currentMessages.push({ role: "user", content: `File yang baru dikirim: ${attachmentContext.name}\nJenis: ${attachmentContext.detectedKind || attachmentContext.type}\n${(attachmentContext.extractedText || attachmentContext.extractionPreview || "Tidak ada teks yang terbaca; gunakan nama file dan metadata untuk menjelaskan kemungkinan kegunaannya.").slice(0, 3000)}` });
     replyMutation.mutate({ channel: selectedId, teamName: selectedChat.title, businessName: businessName.trim() || "Bisnismu", persona: persona.trim() || undefined, agentName: selectedAgent.name, agentRole: selectedAgent.role, skills: selectedAgent.skills, memory: selectedAgent.memory, dataAccess: selectedAgent.dataAccess, pipeline: selectedAgent.pipeline, automation: selectedAgent.automation, history: currentMessages }, {
       onSuccess: (response) => {
         const createResult = response.toolResults?.find((result) => result.toolName === "create_division") as { division?: { id: number; channelId: string; name: string; businessArea: string; description: string; avatarClass: string } } | undefined;
@@ -816,7 +816,7 @@ function WorkspaceApp() {
         saveMessage(selectedId, documentMessage);
         toast.success("File berhasil ditambahkan. Dita sedang memahami isi dan kegunaannya.");
         handleSend(`Tolong jelaskan file ${file.name}: isinya apa, berguna untuk apa, dan apa langkah berikutnya.`, attachment);
-      } catch { toast.error("Dokumen belum bisa diunggah. Coba lagi."); }
+      } catch (error) { toast.error(error instanceof Error && error.message ? error.message : "File belum bisa diunggah. Coba lagi."); }
     };
     reader.readAsDataURL(file);
   };
