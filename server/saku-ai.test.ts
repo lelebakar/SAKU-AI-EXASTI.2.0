@@ -51,6 +51,14 @@ describe("Saku AI helpers", () => {
     expect(prompt).toContain("jangan membuat duplikat");
   });
 
+  it("gives Dita team control but keeps division agents restricted", () => {
+    const assistantPrompt = buildWorkspaceSystemPrompt({ channel: "assistant", teamName: "Dita", businessName: "Toko Rona", agentName: "Dita", agentRole: "Asisten Pribadi" });
+    expect(assistantPrompt).toContain("memiliki kewenangan workspace untuk mengelola seluruh tim");
+    expect(assistantPrompt).toContain("jangan menolak");
+    const teamPrompt = buildWorkspaceSystemPrompt({ channel: "sales", teamName: "Tim Sales", businessName: "Toko Rona", agentName: "Raka", agentRole: "Sales Lead" });
+    expect(teamPrompt).toContain("Dita di Ruang Utama");
+  });
+
   it("normalizes text and array response content", () => {
     expect(extractTextContent([{ type: "text", text: "Halo" }, { type: "image_url", image_url: { url: "x" } }])).toBe("Halo");
     expect(fallbackWorkspaceReply("finance")).toContain("cashflow");

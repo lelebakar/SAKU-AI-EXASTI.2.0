@@ -1,5 +1,6 @@
 export type TeamCapability =
   | "workspace_read"
+  | "team_admin"
   | "pipeline_write"
   | "automation_write"
   | "finance_write"
@@ -22,7 +23,7 @@ const POLICY_BY_TEAM: Record<string, Omit<TeamPolicy, "channelId">> = {
   assistant: {
     teamKey: "assistant",
     label: "Tim Utama",
-    capabilities: ["workspace_read"],
+    capabilities: ["workspace_read", "team_admin"],
     allowedToolNames: [...READ_ONLY_TOOLS, "create_division", "update_division", "delete_division", "recommend_team_structure"],
   },
   sales: {
@@ -80,6 +81,7 @@ export function assertToolAllowed(policy: TeamPolicy, toolName: string): void {
 export function capabilityDescription(policy: TeamPolicy): string {
   const descriptions: Record<TeamCapability, string> = {
     workspace_read: "membaca konteks workspace yang diperlukan",
+    team_admin: "mengelola seluruh tim workspace sesuai izin pemilik",
     pipeline_write: "memajukan pipeline pekerjaannya sendiri",
     automation_write: "membuat automasi untuk pekerjaannya sendiri",
     finance_write: "mencatat transaksi finance",
