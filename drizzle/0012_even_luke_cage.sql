@@ -1,0 +1,1 @@
+ALTER TABLE `saku_bank_mutations` ADD `category` varchar(120);

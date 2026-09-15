@@ -3,11 +3,15 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
+import { registerGoogleOAuthRoutes, registerMetaOAuthRoutes, registerOAuthRoutes } from "./oauth";
+import { registerGoogleSheetsOAuthRoutes } from "../google-sheets-oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { handleSakuAutomationScheduled } from "../automation-scheduler";
+import { handleMootaWebhook } from "../reconciliation";
+import { assertJwtSecret } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -29,13 +33,19 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  assertJwtSecret();
   const app = express();
   const server = createServer(app);
+  app.post("/api/webhooks/moota/:integrationId", express.raw({ type: "application/json", limit: "2mb" }), handleMootaWebhook);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  registerGoogleOAuthRoutes(app);
+  registerMetaOAuthRoutes(app);
+  registerGoogleSheetsOAuthRoutes(app);
+  app.post("/api/scheduled/saku-automation", handleSakuAutomationScheduled);
   // tRPC API
   app.use(
     "/api/trpc",

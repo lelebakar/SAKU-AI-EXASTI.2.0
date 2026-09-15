@@ -34,6 +34,8 @@ export type GenerateImageOptions = {
   model?: string;
   /** Generation quality, e.g. "medium" | "high". Defaults to "medium" for GPT Image 2. */
   quality?: string;
+  /** Optional logical storage prefix for generated assets. */
+  storagePathPrefix?: string;
 };
 
 export type GenerateImageResponse = {
@@ -97,7 +99,7 @@ export async function generateImage(
 
   // Save to S3
   const { url } = await storagePut(
-    `generated/${Date.now()}.png`,
+    `${options.storagePathPrefix?.replace(/\/+$/, "") || "generated"}/${Date.now()}.png`,
     buffer,
     result.image.mimeType
   );

@@ -1,0 +1,1 @@
+ALTER TABLE `saku_memories` ADD `embeddingProvider` varchar(40);

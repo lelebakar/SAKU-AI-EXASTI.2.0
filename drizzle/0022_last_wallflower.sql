@@ -1,0 +1,1 @@
+ALTER TABLE `saku_journal_entries` ADD `entryType` enum('expense','income') DEFAULT 'expense' NOT NULL;

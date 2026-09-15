@@ -1,0 +1,1 @@
+-- Historical migration slot 4; schema changes are represented by the baseline and later migrations.
