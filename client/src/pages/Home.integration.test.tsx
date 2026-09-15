@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
   uploadMutateAsync: vi.fn(),
   onboardingPrepareMutate: vi.fn(),
   workspaceProfile: { businessName: "Toko Rona", persona: "" } as { businessName: string; persona: string } | undefined,
+  memberRecords: [] as Array<{ id: number; email: string; name: string; role: "admin" | "member"; status: "pending" | "active" | "removed"; createdAt: Date }>,
+  ruleRecords: [] as Array<{ id: number; pattern: string; targetCategory: string; autoConfirm: boolean }>,
+  memberUpdateMutate: vi.fn(),
+  ruleRemoveMutate: vi.fn(),
   applyTemplateMutate: vi.fn(),
   employeeContext: null as unknown,
   employeeContextCalls: 0,
@@ -35,7 +39,7 @@ vi.mock("@/lib/trpc", () => ({
     useUtils: () => ({ workspace: { snapshot: { invalidate: vi.fn() }, employeeContext: { invalidate: vi.fn() }, divisions: { list: { invalidate: vi.fn() } }, automations: { list: { invalidate: vi.fn() } }, automationRuns: { list: { invalidate: vi.fn() } }, reconciliationRules: { list: { invalidate: vi.fn() } }, standards: { get: { invalidate: vi.fn() } } } }),
     auth: { register: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) }, login: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) }, requestPasswordReset: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) }, resetPassword: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) }, changePassword: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) } },
     sakuAi: { reply: { useMutation: () => ({ isPending: false, mutate: mocks.replyMutate }) } },
-    workspace: { finance: { review: { useQuery: () => ({ data: { mutations: [], receivables: [] }, isLoading: false, isFetching: false, refetch: vi.fn() }) } }, integrations: { googleSheetsStatus: { useQuery: () => ({ data: { connected: false }, isLoading: false }) }, exportReport: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) }, connectMoota: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) } }, profile: { get: { useQuery: () => ({ data: mocks.workspaceProfile, isLoading: false }) }, update: { useMutation: () => ({ mutate: vi.fn() }) } }, standards: { get: { useQuery: () => ({ data: undefined, isLoading: false }) }, upsert: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) } }, messages: { list: { useQuery: () => ({ data: mocks.messagesUnavailable ? undefined : mocks.persistedMessages, isLoading: false }) }, save: { useMutation: () => ({ mutate: mocks.saveMessageMutate }) } }, members: { list: { useQuery: () => ({ data: [] }) }, invite: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) } , update: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) } }, support: { list: { useQuery: () => ({ data: [] }) }, create: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) } }, onboarding: { prepare: { useMutation: (options: { onSuccess: (result: any) => void }) => ({ isPending: false, mutate: (input: unknown) => { mocks.onboardingPrepareMutate(input); options.onSuccess({ businessName: "Toko Rona", persona: "Profil bisnis siap.", seededChannels: ["assistant", "sales"], plan: { teams: [{ name: "Tim Sales" }] } }); } }) } }, divisions: { list: { useQuery: () => ({ data: [] }) } }, automations: { list: { useQuery: () => ({ data: [] }) } }, reconciliationRules: { list: { useQuery: () => ({ data: [], isLoading: false }) }, create: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) }, remove: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) } }, snapshot: { useQuery: () => ({ data: { divisions: 5, files: 8, automations: 6, pipelines: 5 } }) }, pipelineTemplates: { list: { useQuery: () => ({ data: mocks.pipelineTemplates }) }, applyTemplate: { useMutation: () => ({ isPending: false, mutate: mocks.applyTemplateMutate }) } }, automationRuns: { list: { useQuery: () => ({ data: mocks.automationRuns }) } }, employeeContext: { useQuery: (input: unknown) => { mocks.employeeContextCalls += 1; mocks.employeeContextArgs.push(input); return { data: mocks.employeeContext }; } } },
+    workspace: { finance: { review: { useQuery: () => ({ data: { mutations: [], receivables: [] }, isLoading: false, isFetching: false, refetch: vi.fn() }) } }, integrations: { googleSheetsStatus: { useQuery: () => ({ data: { connected: false }, isLoading: false }) }, exportReport: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) }, connectMoota: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) } }, profile: { get: { useQuery: () => ({ data: mocks.workspaceProfile, isLoading: false }) }, update: { useMutation: () => ({ mutate: vi.fn() }) } }, standards: { get: { useQuery: () => ({ data: undefined, isLoading: false }) }, upsert: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) } }, messages: { list: { useQuery: () => ({ data: mocks.messagesUnavailable ? undefined : mocks.persistedMessages, isLoading: false }) }, save: { useMutation: () => ({ mutate: mocks.saveMessageMutate }) } }, members: { list: { useQuery: () => ({ data: mocks.memberRecords }) }, invite: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) } , update: { useMutation: () => ({ isPending: false, mutate: mocks.memberUpdateMutate }) } }, support: { list: { useQuery: () => ({ data: [] }) }, create: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) } }, onboarding: { prepare: { useMutation: (options: { onSuccess: (result: any) => void }) => ({ isPending: false, mutate: (input: unknown) => { mocks.onboardingPrepareMutate(input); options.onSuccess({ businessName: "Toko Rona", persona: "Profil bisnis siap.", seededChannels: ["assistant", "sales"], plan: { teams: [{ name: "Tim Sales" }] } }); } }) } }, divisions: { list: { useQuery: () => ({ data: [] }) } }, automations: { list: { useQuery: () => ({ data: [] }) } }, reconciliationRules: { list: { useQuery: () => ({ data: mocks.ruleRecords, isLoading: false }) }, create: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) }, remove: { useMutation: () => ({ isPending: false, mutate: mocks.ruleRemoveMutate }) } }, snapshot: { useQuery: () => ({ data: { divisions: 5, files: 8, automations: 6, pipelines: 5 } }) }, pipelineTemplates: { list: { useQuery: () => ({ data: mocks.pipelineTemplates }) }, applyTemplate: { useMutation: () => ({ isPending: false, mutate: mocks.applyTemplateMutate }) } }, automationRuns: { list: { useQuery: () => ({ data: mocks.automationRuns }) } }, employeeContext: { useQuery: (input: unknown) => { mocks.employeeContextCalls += 1; mocks.employeeContextArgs.push(input); return { data: mocks.employeeContext }; } } },
     storage: {
       list: { useQuery: () => ({ data: [] }) },
       upload: { useMutation: () => ({ isPending: false, mutateAsync: mocks.uploadMutateAsync }) },
@@ -51,6 +55,10 @@ describe("SAKU AI rendered create-division flow", () => {
   beforeEach(() => {
     mocks.authUser = { name: "Rani", openId: "owner-saku-test" };
     mocks.workspaceProfile = { businessName: "Toko Rona", persona: "" };
+    mocks.memberRecords = [];
+    mocks.ruleRecords = [];
+    mocks.memberUpdateMutate.mockReset();
+    mocks.ruleRemoveMutate.mockReset();
     mocks.replyMutate.mockReset();
     mocks.uploadMutateAsync.mockReset();
     mocks.onboardingPrepareMutate.mockReset();
@@ -129,6 +137,31 @@ describe("SAKU AI rendered create-division flow", () => {
     expect(screen.getByRole("button", { name: "Catat undangan" })).toBeTruthy();
     expect(screen.getByText("Pusat bantuan SAKU AI")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Kirim ke pusat bantuan" })).toBeTruthy();
+  });
+
+  it("requires confirmation before disabling a member or deleting a matching rule", async () => {
+    mocks.memberRecords = [{ id: 7, email: "andi@example.com", name: "Andi", role: "member", status: "active", createdAt: new Date() }];
+    mocks.ruleRecords = [{ id: 9, pattern: "Tokopedia", targetCategory: "Marketplace", autoConfirm: true }];
+    render(<Home />);
+    fireEvent.click(screen.getByRole("button", { name: "Pengaturan akun" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Nonaktifkan" }));
+    expect(screen.getByRole("alertdialog")).toBeTruthy();
+    expect(screen.getByText("Nonaktifkan akses anggota?")).toBeTruthy();
+    expect(mocks.memberUpdateMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Nonaktifkan" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ya, nonaktifkan" }));
+    expect(mocks.memberUpdateMutate).toHaveBeenCalledWith({ id: 7, status: "removed" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Hapus aturan Tokopedia" }));
+    expect(screen.getByText("Hapus aturan smart-matching?")).toBeTruthy();
+    expect(mocks.ruleRemoveMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hapus aturan Tokopedia" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ya, hapus aturan" }));
+    expect(mocks.ruleRemoveMutate).toHaveBeenCalledWith({ ruleId: 9 });
   });
 
   it("re-fetches persisted employee context after remount", () => {
