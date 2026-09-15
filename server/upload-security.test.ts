@@ -7,8 +7,8 @@ describe("storage.upload file validation", () => {
     expect(validateUploadFile("image/png", png)).toBe("image/png");
   });
 
-  it("rejects an unsupported MIME type", () => {
-    expect(() => validateUploadFile("application/x-msdownload", Buffer.from("MZ"))).toThrow("Jenis file tidak didukung");
+  it("accepts an arbitrary non-empty MIME type without executing or interpreting it", () => {
+    expect(validateUploadFile("application/x-msdownload", Buffer.from("MZ"))).toBe("application/x-msdownload");
   });
 
   it("rejects a MIME-spoofed file when magic bytes do not match", () => {

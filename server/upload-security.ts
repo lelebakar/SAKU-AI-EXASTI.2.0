@@ -36,12 +36,9 @@ function signatureMatches(mimeType: AllowedUploadMimeType, data: Buffer) {
 
 export function validateUploadFile(mimeType: string, data: Buffer) {
   const normalizedMime = mimeType.trim().toLowerCase();
-  if (!(normalizedMime in ALLOWED_UPLOAD_TYPES)) {
-    throw new Error("Jenis file tidak didukung. Unggah JPG, PNG, WebP, PDF, CSV, XLSX, atau DOCX.");
-  }
   if (!data.length) throw new Error("File kosong tidak dapat diunggah.");
-  if (!signatureMatches(normalizedMime as AllowedUploadMimeType, data)) {
+  if (normalizedMime in ALLOWED_UPLOAD_TYPES && !signatureMatches(normalizedMime as AllowedUploadMimeType, data)) {
     throw new Error(`Isi file tidak cocok dengan tipe ${ALLOWED_UPLOAD_TYPES[normalizedMime as AllowedUploadMimeType]}. Periksa file lalu coba lagi.`);
   }
-  return normalizedMime as AllowedUploadMimeType;
+  return normalizedMime || "application/octet-stream";
 }

@@ -70,6 +70,7 @@ type Attachment = {
   extractionPreview?: string;
   extractedText?: string;
   detectedKind?: string;
+  understanding?: string;
 };
 
 type ChatMessage = {
@@ -702,6 +703,7 @@ function WorkspaceApp() {
     extractionPreview: file.structuredPreview || undefined,
     extractedText: file.extractedText || undefined,
     detectedKind: file.detectedKind,
+    understanding: file.structuredPreview || undefined,
   })), [storedFiles]);
   const selectedChat = chats.find((chat) => chat.id === selectedId) ?? chats[0];
   const { data: activeEmployeeContext, isLoading: employeeLoading } = trpc.workspace.employeeContext.useQuery({ channelId: selectedId }, { enabled: Boolean(user) });
@@ -729,7 +731,7 @@ function WorkspaceApp() {
   };
   const saveMessage = (channelId: ChannelId, message: ChatMessage) => {
     const attachment = message.attachment;
-    const attachmentMetadata = attachment ? { name: attachment.name, type: attachment.type, size: attachment.size, url: attachment.url, extractionStatus: attachment.extractionStatus, extractionPreview: attachment.extractionPreview, detectedKind: attachment.detectedKind } : undefined;
+    const attachmentMetadata = attachment ? { name: attachment.name, type: attachment.type, size: attachment.size, url: attachment.url, extractionStatus: attachment.extractionStatus, extractionPreview: attachment.extractionPreview, detectedKind: attachment.detectedKind, understanding: attachment.understanding } : undefined;
     saveMessageMutation.mutate({ channelId, message: { messageKey: message.id, sender: message.sender, senderName: message.senderName, senderRole: message.senderRole, content: message.text, attachmentJson: attachmentMetadata ? JSON.stringify(attachmentMetadata) : undefined } });
   };
   useEffect(() => {
@@ -757,7 +759,7 @@ function WorkspaceApp() {
     setChats((current) => current.map((chat) => chat.id === channelId ? { ...chat, messages: [...chat.messages, message], preview: message.text || message.attachment?.name || chat.preview, time: message.time, unread: 0 } : chat));
   };
 
-  const handleSend = (value = input) => {
+  const handleSend = (value = input, attachmentContext?: Attachment) => {
     if (!user) { toast.info("Masuk dulu untuk mengobrol dengan tim SAKU AI."); startLogin(); return; }
     const text = value.trim();
     if (!text || replyMutation.isPending) return;
@@ -765,7 +767,8 @@ function WorkspaceApp() {
     appendMessage(selectedId, ownerMessage);
     saveMessage(selectedId, ownerMessage);
     setInput("");
-    const currentMessages = [...selectedChat.messages, ownerMessage].slice(-10).map((message) => ({ role: message.sender === "owner" ? "user" as const : "assistant" as const, content: message.text || message.attachment?.name || "Dokumen terlampir" }));
+    const currentMessages = [...selectedChat.messages, ownerMessage].slice(-10).map((message) => ({ role: message.sender === "owner" ? "user" as const : "assistant" as const, content: message.text || (message.attachment ? `File terlampir: ${message.attachment.name}\n${message.attachment.extractedText || message.attachment.extractionPreview || "Tidak ada teks yang terbaca."}` : "Dokumen terlampir") }));
+    if (attachmentContext) currentMessages.push({ role: "user", content: `File yang baru dikirim: ${attachmentContext.name}\nJenis: ${attachmentContext.detectedKind || attachmentContext.type}\n${attachmentContext.extractedText || attachmentContext.extractionPreview || "Tidak ada teks yang terbaca; gunakan nama file dan metadata untuk menjelaskan kemungkinan kegunaannya."}`.slice(0, 4000) });
     replyMutation.mutate({ channel: selectedId, teamName: selectedChat.title, businessName: businessName.trim() || "Bisnismu", persona: persona.trim() || undefined, agentName: selectedAgent.name, agentRole: selectedAgent.role, skills: selectedAgent.skills, memory: selectedAgent.memory, dataAccess: selectedAgent.dataAccess, pipeline: selectedAgent.pipeline, automation: selectedAgent.automation, history: currentMessages }, {
       onSuccess: (response) => {
         const createResult = response.toolResults?.find((result) => result.toolName === "create_division") as { division?: { id: number; channelId: string; name: string; businessArea: string; description: string; avatarClass: string } } | undefined;
@@ -806,12 +809,13 @@ function WorkspaceApp() {
         const dataUrl = String(reader.result);
         const uploaded = await uploadMutation.mutateAsync({ channelId: selectedId, fileName: file.name, mimeType: file.type || "application/octet-stream", dataUrl });
         const type: Attachment["type"] = file.type.includes("image") ? "image" : file.type.includes("sheet") || file.name.endsWith(".xlsx") ? "excel" : file.type.includes("pdf") ? "pdf" : file.type.includes("word") ? "word" : "other";
-        const attachment = { name: file.name, type, size: `${Math.max(1, Math.round(file.size / 1024))} KB`, url: uploaded.url, extractionStatus: uploaded.extractionStatus, extractionPreview: uploaded.extractionPreview, extractedText: uploaded.extractedText, detectedKind: uploaded.detectedKind } as Attachment;
+        const attachment = { name: file.name, type, size: `${Math.max(1, Math.round(file.size / 1024))} KB`, url: uploaded.url, extractionStatus: uploaded.extractionStatus, extractionPreview: uploaded.extractionPreview, extractedText: uploaded.extractedText, detectedKind: uploaded.detectedKind, understanding: uploaded.understanding } as Attachment;
         setUploadedFiles((current) => ({ ...current, [selectedId]: [...(current[selectedId] ?? []), attachment] }));
         const documentMessage: ChatMessage = { id: makeId("document"), sender: "owner", senderName: userName, attachment, time: nowTime() };
         appendMessage(selectedId, documentMessage);
         saveMessage(selectedId, documentMessage);
-        toast.success(uploaded.extractionStatus === "complete" ? "Dokumen berhasil ditambahkan. Konten terbaca." : "Dokumen berhasil ditambahkan ke percakapan.");
+        toast.success("File berhasil ditambahkan. Dita sedang memahami isi dan kegunaannya.");
+        handleSend(`Tolong jelaskan file ${file.name}: isinya apa, berguna untuk apa, dan apa langkah berikutnya.`, attachment);
       } catch { toast.error("Dokumen belum bisa diunggah. Coba lagi."); }
     };
     reader.readAsDataURL(file);
@@ -845,7 +849,7 @@ function WorkspaceApp() {
             {workspaceLoading && <WorkspaceLoadingSkeleton stages={loadingStages} />}
             {!chatQuery.trim() && !visibleMessages.length && <WorkspaceGuide onStart={() => setOnboardingOpen(true)} onOpenSettings={() => { setView("settings"); setShowSidebar(false); }} hasBusinessName={Boolean(businessName.trim())} />}
             <div className="chat-canvas"><div className="chat-day-divider"><span>Hari ini</span></div><div className="chat-messages">{nextMessageCursor && <button type="button" onClick={() => setMessageCursor(nextMessageCursor)} className="secondary-button mx-auto mb-3 justify-center text-[14px]">Muat riwayat lebih lama</button>}{visibleMessages.map((message) => <MessageBubble key={message.id} message={message} />)}{!chatQuery.trim() && !visibleMessages.length && <div className="conversation-empty-state"><Sparkles className="h-5 w-5" /><strong>Belum ada pesan di sini</strong><span>Tulis kebutuhanmu di bawah untuk memulai percakapan dengan {selectedAgent.name}.</span></div>}{chatQuery.trim() && !visibleMessages.length && <div className="search-empty-state"><Search className="h-5 w-5" /><strong>Tidak ada pesan yang cocok</strong><span>Coba kata kunci lain atau bersihkan pencarian.</span></div>}{replyMutation.isPending && <div className="message-row justify-start"><span className="message-avatar bg-[#d8efe6] text-[#1c806b]">{selectedId === "assistant" ? "D" : selectedChat.members[0]?.initials}</span><div className="message-stack items-start"><span className="mb-1 px-1 text-[14px] font-semibold text-[#4b8b7a]">{selectedId === "assistant" ? "Dita" : selectedChat.members[0]?.name} <span className="font-normal text-[#9aa29f]">sedang mengetik…</span></span><div className="typing-bubble"><span /><span /><span /></div></div></div>}</div></div>
-            <div className="composer-wrap">{!chatQuery.trim() && !visibleMessages.length && <div className="quick-prompts" aria-label="Saran untuk memulai"><span className="quick-prompts-label">Mulai dari</span>{quickPrompts.map((prompt) => <button type="button" key={prompt} className="quick-prompt" onClick={() => { setInput(prompt); composerInputRef.current?.focus(); }}>{prompt}</button>)}</div>}<div className="composer"><input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv" /><button type="button" data-tour="tour-attach" onClick={() => fileInputRef.current?.click()} aria-label={uploadMutation.isPending ? "Sedang mengunggah dokumen" : "Lampirkan dokumen"} aria-busy={uploadMutation.isPending} className="composer-icon" disabled={uploadMutation.isPending || !user}>{uploadMutation.isPending ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Paperclip className="h-[18px] w-[18px]" />}</button><input ref={composerInputRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); handleSend(); } }} placeholder={selectedId === "assistant" ? "Tulis pesan ke Dita…" : `Tulis pesan ke ${selectedChat.title}…`} /><button type="button" data-tour="tour-send" aria-label={replyMutation.isPending ? "Dita sedang menyiapkan jawaban" : "Kirim pesan"} aria-busy={replyMutation.isPending} onClick={() => handleSend()} disabled={!input.trim() || replyMutation.isPending} className="composer-send">{replyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</button></div><div className="composer-hint"><span><ShieldCheck className="h-3 w-3" /> Data workspace privat</span><span>Enter untuk kirim</span></div></div>
+            <div className="composer-wrap">{!chatQuery.trim() && !visibleMessages.length && <div className="quick-prompts" aria-label="Saran untuk memulai"><span className="quick-prompts-label">Mulai dari</span>{quickPrompts.map((prompt) => <button type="button" key={prompt} className="quick-prompt" onClick={() => { setInput(prompt); composerInputRef.current?.focus(); }}>{prompt}</button>)}</div>}<div className="composer"><input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} accept="*/*" /><button type="button" data-tour="tour-attach" onClick={() => fileInputRef.current?.click()} aria-label={uploadMutation.isPending ? "Sedang mengunggah file" : "Lampirkan file apa pun"} aria-busy={uploadMutation.isPending} className="composer-icon" disabled={uploadMutation.isPending || !user}>{uploadMutation.isPending ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Paperclip className="h-[18px] w-[18px]" />}</button><input ref={composerInputRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); handleSend(); } }} placeholder={selectedId === "assistant" ? "Tulis pesan ke Dita…" : `Tulis pesan ke ${selectedChat.title}…`} /><button type="button" data-tour="tour-send" aria-label={replyMutation.isPending ? "Dita sedang menyiapkan jawaban" : "Kirim pesan"} aria-busy={replyMutation.isPending} onClick={() => handleSend()} disabled={!input.trim() || replyMutation.isPending} className="composer-send">{replyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</button></div><div className="composer-hint"><span><ShieldCheck className="h-3 w-3" /> Data workspace privat</span><span>Enter untuk kirim</span></div></div>
           </>}
         </section>
         {detailsOpen && view === "chat" && <DetailsPanel chat={selectedChat} onClose={() => setDetailsOpen(false)} onManageMembers={() => { setView("settings"); setDetailsOpen(false); setShowSidebar(false); }} uploadedFiles={[...persistedAttachments, ...(uploadedFiles[selectedId] ?? [])]} />}

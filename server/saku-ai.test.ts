@@ -146,9 +146,21 @@ describe("file intelligence", () => {
     expect(result.preview).toContain("Kopi · 25000");
   });
 
-  it("routes images to the vision path and marks unsupported office files honestly", async () => {
+  it("routes images to the vision path and accepts legacy office files with metadata", async () => {
     expect(await extractFileIntelligence("nota.png", "image/png", Buffer.from("image"))).toMatchObject({ kind: "image", status: "pending", needsVision: true });
-    expect(await extractFileIntelligence("brief.doc", "application/msword", Buffer.from("doc"))).toMatchObject({ kind: "document", status: "unsupported", needsVision: false });
+    expect(await extractFileIntelligence("brief.doc", "application/msword", Buffer.from("doc"))).toMatchObject({ kind: "unknown", status: "complete", needsVision: false });
+  });
+
+  it("extracts common text and code files", async () => {
+    const result = await extractFileIntelligence("resep.json", "application/json", Buffer.from('{"produk":"Kopi","harga":25000}'));
+    expect(result).toMatchObject({ kind: "text", status: "complete", needsVision: false });
+    expect(result.text).toContain("Kopi");
+  });
+
+  it("keeps arbitrary binary files attachable with honest metadata", async () => {
+    const result = await extractFileIntelligence("backup.bin", "application/octet-stream", Buffer.from([1, 2, 3]));
+    expect(result).toMatchObject({ kind: "unknown", status: "complete", needsVision: false });
+    expect(result.preview).toContain("Metadata tersedia");
   });
 
   it("reads XLSX sheets into labeled text for the AI", async () => {

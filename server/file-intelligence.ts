@@ -113,6 +113,7 @@ async function extractDocx(fileName: string, data: Buffer): Promise<FileIntellig
 export async function extractFileIntelligence(fileName: string, mimeType: string, data: Buffer): Promise<FileIntelligence> {
   const lowerName = fileName.toLowerCase();
   const lowerMime = mimeType.toLowerCase();
+  const textLikeExtension = /\.(txt|md|markdown|json|xml|html?|css|scss|less|js|jsx|ts|tsx|py|java|go|rs|sql|yaml|yml|toml|ini|log|srt|vtt)$/i.test(lowerName);
   if (lowerMime.startsWith("image/") || /\.(png|jpe?g|webp|gif|heic)$/i.test(lowerName)) {
     return { kind: "image", status: "pending", needsVision: true, preview: "Gambar akan dibaca dengan OCR visual." };
   }
@@ -123,12 +124,10 @@ export async function extractFileIntelligence(fileName: string, mimeType: string
   if (lowerMime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || lowerName.endsWith(".xlsx")) return extractSpreadsheet(fileName, data);
   if (lowerMime === "application/pdf" || lowerName.endsWith(".pdf")) return extractPdf(fileName, data);
   if (lowerMime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || lowerName.endsWith(".docx")) return extractDocx(fileName, data);
-  if (lowerMime === "text/plain" || lowerName.endsWith(".txt")) {
+  if (lowerMime.startsWith("text/") || textLikeExtension || ["application/json", "application/xml", "application/javascript"].includes(lowerMime)) {
     const text = cleanText(data.toString("utf8"));
-    return { kind: "text", status: "complete", needsVision: false, text, preview: text.slice(0, 1200) };
+    return { kind: "text", status: text ? "complete" : "failed", needsVision: false, text, preview: text ? `Teks · ${fileName}\n${text.slice(0, 1200)}` : "File teks kosong atau tidak terbaca." };
   }
-  if (lowerMime === "application/msword" || /\.(doc|xls|ppt|pptx)$/i.test(lowerName)) {
-    return { kind: "document", status: "unsupported", needsVision: false, preview: "Format dokumen ini belum didukung. Gunakan PDF, DOCX, XLSX, CSV, TXT, atau gambar." };
-  }
-  return { kind: "unknown", status: "unsupported", needsVision: false, preview: "Format file belum didukung." };
+  const label = lowerMime.startsWith("audio/") ? "audio" : lowerMime.startsWith("video/") ? "video" : lowerMime.includes("zip") || lowerMime.includes("compressed") ? "arsip" : "file";
+  return { kind: "unknown", status: "complete", needsVision: false, preview: `Metadata tersedia · ${fileName}\nJenis: ${mimeType || "application/octet-stream"}\nKategori: ${label}\nIsi file ini tersimpan aman; analisis isi otomatis membutuhkan format yang dapat dibaca.` };
 }

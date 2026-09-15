@@ -22,6 +22,17 @@ import { getPublicOrigin, sendPasswordResetEmail } from "./password-reset-email"
 import { assertToolAllowed, capabilityDescription, isToolAllowed, resolveTeamPolicy, scopedDataAccess } from "./team-policy";
 
 export const IMAGE_OCR_PROMPT = "Baca gambar ini dengan OCR. Ekstrak semua teks, angka, nama produk, harga, tanggal, dan catatan penting. Balas hanya dengan transkrip terstruktur dalam Bahasa Indonesia.";
+const FILE_UNDERSTANDING_PROMPT = "Kamu adalah analis file untuk pemilik UMKM. Jelaskan dalam Bahasa Indonesia secara singkat: (1) file ini kemungkinan berisi apa, (2) untuk apa file ini berguna dalam pekerjaan bisnis, dan (3) tindakan berikutnya yang disarankan. Jangan mengarang fakta yang tidak ada; tandai keterbatasan jika hanya metadata yang tersedia. Format: Isi:, Kegunaan:, Saran:.";
+
+async function understandUploadedFile(fileName: string, mimeType: string, fileSize: number, extractedText?: string, preview?: string): Promise<string> {
+  const source = `Nama file: ${fileName}\nJenis MIME: ${mimeType || "application/octet-stream"}\nUkuran: ${fileSize} byte\nKonten/preview:\n${(extractedText || preview || "Tidak ada teks yang dapat diekstrak.").slice(0, 12_000)}`;
+  try {
+    const response = await invokeLLM({ messages: [{ role: "system", content: FILE_UNDERSTANDING_PROMPT }, { role: "user", content: source }] });
+    return extractTextContent(response.choices?.[0]?.message?.content).trim().slice(0, 2_000) || "Isi file tersimpan, tetapi AI belum dapat membuat ringkasan.";
+  } catch {
+    return "Isi file tersimpan aman. Analisis AI belum tersedia untuk file ini.";
+  }
+}
 
 const historyMessage = z.object({
   role: z.enum(["user", "assistant"]),
@@ -886,6 +897,8 @@ export const appRouter = router({
             extracted = { ...extracted, status: ocrText ? "complete" : "failed", text: ocrText || undefined, preview: ocrText ? ocrText.slice(0, 12000) : "OCR tidak menemukan teks yang bisa dibaca.", needsVision: false };
           } catch { extracted = { ...extracted, status: "failed", needsVision: false, preview: "OCR gambar gagal dijalankan. Coba unggah gambar yang lebih jelas." }; }
         }
+        const understanding = await understandUploadedFile(input.fileName, mimeType, buffer.byteLength, extracted.text, extracted.preview);
+        const structuredPreview = `${extracted.preview || "File berhasil disimpan."}\n\nPemahaman AI\n${understanding}`.slice(0, 12_000);
         const record = await insertSakuFile({
           ownerOpenId: ctx.workspaceOwnerOpenId!,
           channelId: input.channelId,
@@ -897,9 +910,9 @@ export const appRouter = router({
           detectedKind: extracted.kind,
           extractionStatus: extracted.needsVision ? "complete" : extracted.status,
           extractedText: extracted.text?.slice(0, 100_000),
-          structuredPreview: extracted.preview,
+          structuredPreview,
         });
-        return { id: record?.id, key: result.key, url: result.url, fileName: input.fileName, detectedKind: extracted.kind, extractionStatus: extracted.needsVision ? "complete" : extracted.status, extractionPreview: extracted.preview, extractedText: extracted.text };
+        return { id: record?.id, key: result.key, url: result.url, fileName: input.fileName, detectedKind: extracted.kind, extractionStatus: extracted.needsVision ? "complete" : extracted.status, extractionPreview: structuredPreview, understanding, extractedText: extracted.text };
       }),
     list: workspaceProcedure
       .input(z.object({ channelId: z.string().max(64) }))
