@@ -23,6 +23,9 @@ import { assertToolAllowed, capabilityDescription, isToolAllowed, resolveTeamPol
 
 export const IMAGE_OCR_PROMPT = "Baca gambar ini dengan OCR. Ekstrak semua teks, angka, nama produk, harga, tanggal, dan catatan penting. Balas hanya dengan transkrip terstruktur dalam Bahasa Indonesia.";
 const FILE_UNDERSTANDING_PROMPT = "Kamu adalah analis file untuk pemilik UMKM. Jelaskan dalam Bahasa Indonesia secara singkat: (1) file ini kemungkinan berisi apa, (2) untuk apa file ini berguna dalam pekerjaan bisnis, dan (3) tindakan berikutnya yang disarankan. Jangan mengarang fakta yang tidak ada; tandai keterbatasan jika hanya metadata yang tersedia. Format: Isi:, Kegunaan:, Saran:.";
+export function hasExplicitTeamDeletionConfirmation(message: string): boolean {
+  return /\b(ya|iya|setuju|konfirmasi|lanjutkan|hapus saja|saya yakin)\b/i.test(message);
+}
 
 async function understandUploadedFile(fileName: string, mimeType: string, fileSize: number, extractedText?: string, preview?: string): Promise<string> {
   const source = `Nama file: ${fileName}\nJenis MIME: ${mimeType || "application/octet-stream"}\nUkuran: ${fileSize} byte\nKonten/preview:\n${(extractedText || preview || "Tidak ada teks yang dapat diekstrak.").slice(0, 12_000)}`;
@@ -626,8 +629,14 @@ export const appRouter = router({
                 }
                 if (toolCall.function.name === "delete_division") {
                   const args = deleteDivisionArgs.parse(parseToolArguments(toolCall.function.arguments));
+                  const latestUserMessage = [...input.history].reverse().find((message) => message.role === "user")?.content || "";
+                  const confirmed = hasExplicitTeamDeletionConfirmation(latestUserMessage);
+                  const divisions = await listSakuDivisions(ctx.workspaceOwnerOpenId!);
+                  const division = divisions.find((item) => item.id === args.id);
+                  if (!division) throw new Error("Tim yang akan dihapus tidak ditemukan.");
+                  if (!confirmed) return { toolName: "delete_division", success: false, confirmationRequired: true, divisionId: division.id, divisionName: division.name, message: `Konfirmasi diperlukan sebelum menghapus ${division.name}.` };
                   await deleteSakuDivision(ctx.workspaceOwnerOpenId!, args.id);
-                  return { toolName: "delete_division", success: true, id: args.id };
+                  return { toolName: "delete_division", success: true, id: args.id, divisionName: division.name };
                 }
                 if (toolCall.function.name === "recommend_team_structure") {
                   const divisions = await listSakuDivisions(ctx.workspaceOwnerOpenId!);

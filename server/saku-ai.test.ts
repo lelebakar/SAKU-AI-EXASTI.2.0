@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { extractFileIntelligence } from "./file-intelligence";
-import { completeWorkspaceToolTurn, executeWorkspaceToolCalls, fallbackToolReply, generateContentPackage, IMAGE_OCR_PROMPT, invokeLLMWithTransientRetry } from "./routers";
+import { completeWorkspaceToolTurn, executeWorkspaceToolCalls, fallbackToolReply, generateContentPackage, hasExplicitTeamDeletionConfirmation, IMAGE_OCR_PROMPT, invokeLLMWithTransientRetry } from "./routers";
 import { buildWorkspaceSystemPrompt, extractReceiptDraft, extractReceiptDrafts, extractTextContent, fallbackWorkspaceReply, MAX_WORKSPACE_PROMPT_CHARS, normalizeAssistantReply, truncateForLLM } from "./saku-ai";
 import { buildDefaultSakuTeamStandards } from "./db";
 import * as XLSX from "xlsx";
@@ -10,6 +10,12 @@ import * as XLSX from "xlsx";
 const fixture = (name: string) => fs.readFileSync(path.resolve(import.meta.dirname, "fixtures", name));
 
 describe("Saku AI helpers", () => {
+  it("requires explicit second confirmation for destructive team actions", () => {
+    expect(hasExplicitTeamDeletionConfirmation("Hapus tim marketing")).toBe(false);
+    expect(hasExplicitTeamDeletionConfirmation("Ya, saya yakin. Hapus tim marketing.")).toBe(true);
+    expect(hasExplicitTeamDeletionConfirmation("Saya setuju, lanjutkan")).toBe(true);
+  });
+
   it("keeps image OCR instructions consistently in Indonesian", () => {
     expect(IMAGE_OCR_PROMPT).toContain("Baca gambar ini dengan OCR");
     expect(IMAGE_OCR_PROMPT).toContain("Ekstrak semua teks");

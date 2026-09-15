@@ -2,6 +2,7 @@ import React from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
   ArrowLeft,
+  AlertTriangle,
   Archive,
   Activity,
   Bell,
@@ -609,6 +610,7 @@ function WorkspaceApp() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [sidebarMenuOpen, setSidebarMenuOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [pendingTeamDeletion, setPendingTeamDeletion] = useState<{ id: number; name: string } | null>(null);
   const [iconTourOpen, setIconTourOpen] = useState(false);
   const [businessName, setBusinessName] = useState("");
   const [persona, setPersona] = useState("");
@@ -778,7 +780,8 @@ function WorkspaceApp() {
           toast.success(`${createdChat.title} sudah ditambahkan ke Tim divisi.`);
           void workspaceUtils.workspace.divisions.list.invalidate();
         }
-        const actionResult = response.toolResults?.[0] as { toolName?: string; automation?: AutomationRecord; caption?: string; imageUrl?: string; platform?: "instagram" | "twitter" | "general" } | undefined;
+        const actionResult = response.toolResults?.[0] as { toolName?: string; automation?: AutomationRecord; caption?: string; imageUrl?: string; platform?: "instagram" | "twitter" | "general"; confirmationRequired?: boolean; divisionId?: number; divisionName?: string } | undefined;
+        if (actionResult?.toolName === "delete_division" && actionResult.confirmationRequired && actionResult.divisionId && actionResult.divisionName) setPendingTeamDeletion({ id: actionResult.divisionId, name: actionResult.divisionName });
         if (["update_division", "delete_division", "recommend_team_structure"].includes(actionResult?.toolName || "")) void workspaceUtils.workspace.divisions.list.invalidate();
         const createdAutomation = actionResult?.automation;
         if (actionResult?.toolName === "create_automation" && createdAutomation) setLocalAutomations((current) => current.some((automation) => automation.id === createdAutomation.id) ? current : [...current, createdAutomation]);
@@ -856,6 +859,7 @@ function WorkspaceApp() {
         </section>
         {detailsOpen && view === "chat" && <DetailsPanel chat={selectedChat} onClose={() => setDetailsOpen(false)} onManageMembers={() => { setView("settings"); setDetailsOpen(false); setShowSidebar(false); }} uploadedFiles={[...persistedAttachments, ...(uploadedFiles[selectedId] ?? [])]} />}
       </div>
+      {pendingTeamDeletion && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#20322e]/35 p-4" role="presentation"><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby="team-delete-title" aria-describedby="team-delete-description"><div className="mb-3 flex items-start gap-3"><div className="rounded-xl bg-[#fff0ed] p-2 text-[#c65b4b]"><AlertTriangle className="h-5 w-5" aria-hidden="true" /></div><div><h2 id="team-delete-title" className="text-base font-bold text-[#2b3934]">Yakin menghapus tim?</h2><p id="team-delete-description" className="mt-1 text-sm leading-5 text-[#68766f]">Dita meminta izin kedua untuk menghapus <strong>{pendingTeamDeletion.name}</strong>. Data tim dan aksesnya bisa tidak muncul lagi di workspace.</p></div></div><div className="flex justify-end gap-2"><button type="button" className="secondary-button" onClick={() => setPendingTeamDeletion(null)}>Batal</button><button type="button" className="rounded-lg bg-[#c65b4b] px-4 py-2 text-sm font-bold text-white hover:bg-[#b64e40]" onClick={() => { const name = pendingTeamDeletion.name; setPendingTeamDeletion(null); handleSend(`Ya, saya yakin. Konfirmasi hapus tim ${name}.`); }}>Ya, hapus tim</button></div></div></div>}
       {onboardingOpen && <OnboardingModal onClose={() => onboardingPrepareMutation.isPending ? undefined : setOnboardingOpen(false)} initialBusinessName={businessName.trim() || "Bisnismu"} isSaving={onboardingPrepareMutation.isPending} onFinish={(interview) => { if (!user) { startLogin(); return; } onboardingPrepareMutation.mutate(interview); }} />}
       <IconTour open={iconTourOpen} onClose={() => setIconTourOpen(false)} />
     </main>
