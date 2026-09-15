@@ -57,6 +57,8 @@ describe("Saku AI helpers", () => {
     expect(assistantPrompt).toContain("jangan menolak");
     expect(assistantPrompt).toContain("all=true");
     expect(assistantPrompt).toContain("Jangan mengganti permintaan hapus menjadi list_divisions saja");
+    expect(assistantPrompt).toContain("konteks kerja, bukan template jawaban");
+    expect(assistantPrompt).toContain("tidak semua jawaban membutuhkan daftar atau next step");
     const teamPrompt = buildWorkspaceSystemPrompt({ channel: "sales", teamName: "Tim Sales", businessName: "Toko Rona", agentName: "Raka", agentRole: "Sales Lead" });
     expect(teamPrompt).toContain("Dita di Ruang Utama");
   });
@@ -123,7 +125,7 @@ describe("Saku AI helpers", () => {
     expect(prompt).toContain("Tegas, teliti");
     expect(prompt).toContain("langkah aktif 3");
     expect(prompt).toContain("stok di bawah minimum");
-    expect(prompt).toContain("Semua konfigurasi di atas adalah sumber kebenaran kerja");
+    expect(prompt).toContain("Semua konfigurasi di atas adalah konteks kerja, bukan template jawaban");
   });
 
   it("truncates oversized LLM context explicitly", () => {
